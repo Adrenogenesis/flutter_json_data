@@ -1,130 +1,84 @@
-import 'dart:async';
-import 'dart:convert';
-
+import 'package:flutter/foundation.dart';
+import 'package:web_socket_channel/io.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:web_socket_channel/web_socket_channel.dart';
 
-Future<Album> fetchAlbum() async {
-  final response =
-  await http.get(Uri.https('jsonplaceholder.typicode.com', 'albums/1'));
+void main() => runApp(MyApp());
 
-  if (response.statusCode == 200) {
-    // If the server did return a 200 OK response,
-    // then parse the JSON.
-    return Album.fromJson(jsonDecode(response.body));
-  } else {
-    // If the server did not return a 200 OK response,
-    // then throw an exception.
-    throw Exception('Failed to load album');
-  }
-}
-
-Future<Album> updateAlbum(String title) async {
-  final http.Response response = await http.put(
-    Uri.https('jsonplaceholder.typicode.com', 'albums/1'),
-    headers: <String, String>{
-      'Content-Type': 'application/json; charset=UTF-8',
-    },
-    body: jsonEncode(<String, String>{
-      'title': title,
-    }),
-  );
-
-  if (response.statusCode == 200) {
-    // If the server did return a 200 OK response,
-    // then parse the JSON.
-    return Album.fromJson(jsonDecode(response.body));
-  } else {
-    // If the server did not return a 200 OK response,
-    // then throw an exception.
-    throw Exception('Failed to update album.');
-  }
-}
-
-class Album {
-  final int id;
-  final String title;
-
-  Album({this.id, this.title});
-
-  factory Album.fromJson(Map<String, dynamic> json) {
-    return Album(
-      id: json['id'],
-      title: json['title'],
+class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final title = 'WebSocket Demo';
+    return MaterialApp(
+      title: title,
+      home: MyHomePage(
+        title: title,
+        channel: IOWebSocketChannel.connect('wss://echo.websocket.org'),
+      ),
     );
   }
 }
 
-void main() {
-  runApp(MyApp());
-}
+class MyHomePage extends StatefulWidget {
+  final String title;
+  final WebSocketChannel channel;
 
-class MyApp extends StatefulWidget {
-  MyApp({Key key}) : super(key: key);
-
-  @override
-  _MyAppState createState() {
-    return _MyAppState();
-  }
-}
-
-class _MyAppState extends State<MyApp> {
-  final TextEditingController _controller = TextEditingController();
-  Future<Album> _futureAlbum;
+  MyHomePage({Key key, @required this.title, @required this.channel})
+      : super(key: key);
 
   @override
-  void initState() {
-    super.initState();
-    _futureAlbum = fetchAlbum();
-  }
+  _MyHomePageState createState() => _MyHomePageState();
+}
+
+class _MyHomePageState extends State<MyHomePage> {
+  TextEditingController _controller = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Update Data Example',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.title),
       ),
-      home: Scaffold(
-        appBar: AppBar(
-          title: Text('Update Data Example'),
-        ),
-        body: Container(
-          alignment: Alignment.center,
-          padding: const EdgeInsets.all(8.0),
-          child: FutureBuilder<Album>(
-            future: _futureAlbum,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.done) {
-                if (snapshot.hasData) {
-                  return Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: <Widget>[
-                      Text(snapshot.data.title),
-                      TextField(
-                        controller: _controller,
-                        decoration: InputDecoration(hintText: 'Enter Title'),
-                      ),
-                      ElevatedButton(
-                        child: Text('Update Data'),
-                        onPressed: () {
-                          setState(() {
-                            _futureAlbum = updateAlbum(_controller.text);
-                          });
-                        },
-                      ),
-                    ],
-                  );
-                } else if (snapshot.hasError) {
-                  return Text("${snapshot.error}");
-                }
-              }
-
-              return CircularProgressIndicator();
-            },
-          ),
+      body: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Form(
+              child: TextFormField(
+                controller: _controller,
+                decoration: InputDecoration(labelText: 'Send a message'),
+              ),
+            ),
+            StreamBuilder(
+              stream: widget.channel.stream,
+              builder: (context, snapshot) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24.0),
+                  child: Text(snapshot.hasData ? '${snapshot.data}' : ''),
+                );
+              },
+            )
+          ],
         ),
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _sendMessage,
+        tooltip: 'Send message',
+        child: Icon(Icons.send),
+      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
+  }
+
+  void _sendMessage() {
+    if (_controller.text.isNotEmpty) {
+      widget.channel.sink.add(_controller.text);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.channel.sink.close();
+    super.dispose();
   }
 }
