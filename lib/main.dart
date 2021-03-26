@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 
 Future<Album> createAlbum(String title) async {
   final response = await http.post(
-    Uri.https('jsonplaceholder.typicode.com', 'albums'),
+    Uri.https('https://my-json-server.typicode.com/protonwebmaster/flutter_json_data', 'albums'),
     headers: <String, String>{
       'Content-Type': 'application/json; charset=UTF-8',
     },
